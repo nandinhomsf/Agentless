@@ -14,7 +14,7 @@ from agentless.util.preprocess_data import (
     filter_out_test_files,
     get_repo_structure,
 )
-from agentless.util.utils import load_existing_instance_ids, load_jsonl, setup_logger
+from agentless.util.utils import load_existing_instance_ids, load_jsonl, setup_logger, load_swebench
 
 MAX_RETRIES = 5
 
@@ -284,22 +284,30 @@ def localize_instance(
                 )
                 if not args.direct_edit_loc:
                     coarse_found_locs = found_related_locs
-                    (
-                        found_edit_locs,
-                        additional_artifact_loc_edit_location,
-                        edit_loc_traj,
-                    ) = fl.localize_line_from_coarse_function_locs(
-                        pred_files,
-                        coarse_found_locs,
-                        context_window=args.context_window,
-                        add_space=args.add_space,
-                        no_line_number=args.no_line_number,
-                        sticky_scroll=args.sticky_scroll,
-                        mock=args.mock,
-                        temperature=trying_temp,
-                        num_samples=args.num_samples,
-                        keep_old_order=args.keep_old_order,
-                    )
+                    try:
+                        (
+                            found_edit_locs,
+                            additional_artifact_loc_edit_location,
+                            edit_loc_traj,
+                        ) = fl.localize_line_from_coarse_function_locs(
+                            pred_files,
+                            coarse_found_locs,
+                            context_window=args.context_window,
+                            add_space=args.add_space,
+                            no_line_number=args.no_line_number,
+                            sticky_scroll=args.sticky_scroll,
+                            mock=args.mock,
+                            temperature=trying_temp,
+                            num_samples=args.num_samples,
+                            keep_old_order=args.keep_old_order,
+                        )
+                    except ValueError as e:
+                        # even one file exceeds MAX_CONTEXT_LENGTH: record a
+                        # localization failure (no edit locations, no patch)
+                        logger.info(f"Edit localization skipped: {e}")
+                        found_edit_locs = []
+                        edit_loc_traj = {"skipped": str(e)}
+                        break
                     additional_artifact_loc_edit_location = [
                         additional_artifact_loc_edit_location
                     ]
@@ -396,7 +404,7 @@ def localize_instance(
 
 
 def localize_irrelevant(args):
-    swe_bench_data = load_dataset(args.dataset, split="test")
+    swe_bench_data = load_swebench(args.dataset)
     existing_instance_ids = (
         load_existing_instance_ids(args.output_file) if args.skip_existing else set()
     )
@@ -430,7 +438,7 @@ def localize_irrelevant(args):
 
 
 def localize(args):
-    swe_bench_data = load_dataset(args.dataset, split="test")
+    swe_bench_data = load_swebench(args.dataset)
     start_file_locs = load_jsonl(args.start_file) if args.start_file else None
     existing_instance_ids = (
         load_existing_instance_ids(args.output_file) if args.skip_existing else set()
@@ -572,18 +580,12 @@ def main():
         "--model",
         type=str,
         default="gpt-4o-2024-05-13",
-        choices=[
-            "gpt-4o-2024-05-13",
-            "deepseek-coder",
-            "gpt-4o-mini-2024-07-18",
-            "claude-3-5-sonnet-20241022",
-        ],
     )
     parser.add_argument(
         "--backend",
         type=str,
         default="openai",
-        choices=["openai", "deepseek", "anthropic"],
+        choices=["openai", "deepseek", "anthropic", "gemini", "nvidia"],
     )
     parser.add_argument(
         "--dataset",

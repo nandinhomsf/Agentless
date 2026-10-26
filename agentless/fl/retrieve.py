@@ -13,7 +13,7 @@ from agentless.util.preprocess_data import (
     filter_out_test_files,
     get_repo_structure,
 )
-from agentless.util.utils import load_json, load_jsonl, setup_logger
+from agentless.util.utils import load_json, load_jsonl, setup_logger, load_swebench
 
 
 def retrieve_locs(bug, args, swe_bench_data, found_files, prev_o, write_lock=None):
@@ -25,7 +25,8 @@ def retrieve_locs(bug, args, swe_bench_data, found_files, prev_o, write_lock=Non
             break
 
     if found:
-        logger.info(f"skipping {bug['instance_id']} since patch already generated")
+        # the per-instance logger is only created below
+        print(f"skipping {bug['instance_id']} since retrieval already done")
         return None
 
     instance_id = bug["instance_id"]
@@ -97,7 +98,7 @@ def retrieve(args):
     else:
         found_files = []
 
-    swe_bench_data = load_dataset(args.dataset, split="test")
+    swe_bench_data = load_swebench(args.dataset)
     prev_o = load_jsonl(args.output_file) if os.path.exists(args.output_file) else []
 
     if args.num_threads == 1:

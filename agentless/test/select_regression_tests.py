@@ -7,9 +7,10 @@ from tqdm import tqdm
 
 from agentless.util.api_requests import num_tokens_from_messages
 from agentless.util.model import make_model
-from agentless.util.utils import load_jsonl, setup_logger
+from agentless.util.utils import load_jsonl, setup_logger, load_swebench
 
-MAX_CONTEXT_LENGTH = 128000
+# GPT-4o context by default; free tiers may cap input tokens per request far lower
+MAX_CONTEXT_LENGTH = int(os.environ.get("AGENTLESS_MAX_CONTEXT_LENGTH", "128000"))
 
 
 select_tests_prompt_template = """
@@ -150,7 +151,7 @@ def select_tests(args):
             test = json_obj["tests_passing_in_original_repo"]
             instance_test_dict[instance_id] = test
 
-    swe_bench_data = load_dataset(args.dataset, split="test")
+    swe_bench_data = load_swebench(args.dataset)
     instance_ids = (
         swe_bench_data["instance_id"]
         if args.instance_ids is None
@@ -174,18 +175,12 @@ def main():
         "--model",
         type=str,
         default="gpt-4o-2024-05-13",
-        choices=[
-            "gpt-4o-2024-05-13",
-            "deepseek-coder",
-            "gpt-4o-mini-2024-07-18",
-            "claude-3-5-sonnet-20241022",
-        ],
     )
     parser.add_argument(
         "--backend",
         type=str,
         default="openai",
-        choices=["openai", "deepseek", "anthropic"],
+        choices=["openai", "deepseek", "anthropic", "gemini", "nvidia"],
     )
     parser.add_argument("--output_folder", type=str, required=True)
     parser.add_argument("--target_id", type=str)

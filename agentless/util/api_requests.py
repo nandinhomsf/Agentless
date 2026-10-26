@@ -55,11 +55,20 @@ def handler(signum, frame):
     raise Exception("end of time")
 
 
-def request_chatgpt_engine(config, logger, base_url=None, max_retries=40, timeout=100):
+class DailyQuotaExceeded(Exception):
+    """Raised when a free-tier daily quota is exhausted; retrying is pointless until reset."""
+
+
+def request_chatgpt_engine(
+    config, logger, base_url=None, max_retries=40, timeout=100, api_key=None
+):
     ret = None
     retries = 0
 
-    client = openai.OpenAI(base_url=base_url)
+    # slow free-tier models (e.g. Gemma) can take several minutes per response
+    client = openai.OpenAI(
+        base_url=base_url, api_key=api_key, timeout=900 if api_key else openai.NOT_GIVEN
+    )
 
     while ret is None and retries < max_retries:
         try:
@@ -75,11 +84,21 @@ def request_chatgpt_engine(config, logger, base_url=None, max_retries=40, timeou
                 logger.info(e)
                 raise Exception("Invalid API Request")
             elif isinstance(e, openai.RateLimitError):
+                if "PerDay" in str(e):
+                    logger.info(e)
+                    raise DailyQuotaExceeded(str(e))
                 print("Rate limit exceeded. Waiting...")
                 logger.info("Rate limit exceeded. Waiting...")
                 print(e)
                 logger.info(e)
-                time.sleep(5)
+                # per-minute limits on free tiers need longer waits than 5s
+                time.sleep(5 if api_key is None else min(10 * 2**min(retries, 3), 90))
+            elif isinstance(e, openai.InternalServerError) and api_key is not None:
+                # free tiers often return 503 "high demand" for minutes at a time
+                print("Server overloaded. Waiting...")
+                logger.info("Server overloaded. Waiting...")
+                logger.info(e)
+                time.sleep(min(30 * 2 ** min(retries, 3), 300))
             elif isinstance(e, openai.APIConnectionError):
                 print("API connection error. Waiting...")
                 logger.info("API connection error. Waiting...")

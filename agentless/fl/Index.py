@@ -16,6 +16,17 @@ from llama_index.core.retrievers import VectorIndexRetriever
 from llama_index.core.schema import MetadataMode
 from llama_index.embeddings.openai import OpenAIEmbedding
 
+# Set to a HuggingFace model name to embed locally (free) instead of with OpenAI
+LOCAL_EMBED_MODEL = os.environ.get("AGENTLESS_LOCAL_EMBED_MODEL")
+
+
+def get_embed_model():
+    if LOCAL_EMBED_MODEL:
+        from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+
+        return HuggingFaceEmbedding(model_name=LOCAL_EMBED_MODEL)
+    return OpenAIEmbedding(model_name="text-embedding-3-small")
+
 from agentless.util.api_requests import num_tokens_from_messages
 from agentless.util.index_skeleton import parse_global_stmt_from_code
 from agentless.util.preprocess_data import (
@@ -257,12 +268,14 @@ class EmbeddingIndex(ABC):
                 )  # embedding dimension does not matter for mocking.
                 Settings.callback_manager = CallbackManager([token_counter])
             else:
-                embed_model = OpenAIEmbedding(model_name="text-embedding-3-small")
+                embed_model = get_embed_model()
             index = VectorStoreIndex.from_documents(documents, embed_model=embed_model)
             index.storage_context.persist(persist_dir=persist_dir)
         else:
             storage_context = StorageContext.from_defaults(persist_dir=persist_dir)
-            index = load_index_from_storage(storage_context)
+            index = load_index_from_storage(
+                storage_context, embed_model=get_embed_model()
+            )
 
         self.logger.info(f"Retrieving with query:\n{self.problem_statement}")
 

@@ -1,3 +1,4 @@
+import os
 from abc import ABC, abstractmethod
 
 from agentless.repair.repair import construct_topn_file_context
@@ -11,7 +12,8 @@ from agentless.util.preprocess_data import (
     show_project_structure,
 )
 
-MAX_CONTEXT_LENGTH = 128000
+# GPT-4o context by default; free tiers may cap input tokens per request far lower
+MAX_CONTEXT_LENGTH = int(os.environ.get("AGENTLESS_MAX_CONTEXT_LENGTH", "128000"))
 
 
 class FL(ABC):

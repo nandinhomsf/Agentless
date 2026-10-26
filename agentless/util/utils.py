@@ -91,3 +91,16 @@ def load_existing_instance_ids(output_file):
                 except json.JSONDecodeError:
                     continue
     return instance_ids
+
+
+def load_swebench(dataset):
+    """Load the test split, restricted to AGENTLESS_INSTANCE_IDS_FILE if set."""
+    from datasets import load_dataset
+
+    data = load_dataset(dataset, split="test")
+    ids_file = os.environ.get("AGENTLESS_INSTANCE_IDS_FILE")
+    if ids_file:
+        with open(ids_file) as f:
+            ids = {line.strip() for line in f if line.strip()}
+        data = data.filter(lambda bug: bug["instance_id"] in ids)
+    return data

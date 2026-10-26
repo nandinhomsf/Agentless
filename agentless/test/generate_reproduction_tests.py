@@ -13,7 +13,7 @@ from tqdm import tqdm
 from agentless.util.api_requests import num_tokens_from_messages
 from agentless.util.model import make_model
 from agentless.util.postprocess_data import remove_comments_and_docstrings
-from agentless.util.utils import load_jsonl, setup_logger
+from agentless.util.utils import load_jsonl, setup_logger, load_swebench
 
 generate_tests_prompt_template = """
 We are currently solving the following issue within our repository. Here is the issue text:
@@ -249,7 +249,7 @@ def generate_tests(args):
     with open(f"{args.output_folder}/args.json", "w") as f:
         json.dump(vars(args), f, indent=4)
 
-    swe_bench_data = load_dataset(args.dataset, split="test")
+    swe_bench_data = load_swebench(args.dataset)
     instances = swe_bench_data["instance_id"]
     prev_o = load_jsonl(args.output_file) if os.path.exists(args.output_file) else []
 
@@ -495,18 +495,12 @@ def main():
         "--model",
         type=str,
         default="gpt-4o-2024-05-13",
-        choices=[
-            "gpt-4o-2024-05-13",
-            "deepseek-coder",
-            "gpt-4o-mini-2024-07-18",
-            "claude-3-5-sonnet-20241022",
-        ],
     )
     parser.add_argument(
         "--backend",
         type=str,
         default="openai",
-        choices=["openai", "deepseek", "anthropic"],
+        choices=["openai", "deepseek", "anthropic", "gemini", "nvidia"],
     )
     parser.add_argument("--output_folder", type=str, required=True)
     parser.add_argument("--output_file", type=str)
