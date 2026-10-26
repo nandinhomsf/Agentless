@@ -1,0 +1,11 @@
+[Unit]
+Description=Agentless replication job queue (resumes after reboot)
+
+[Service]
+Type=simple
+ExecStart=/bin/bash -c 'cd "/CAMINHO/PARA/genai-agentless" && exec scripts/runner.sh >> logs/runner.log 2>&1'
+Restart=on-failure
+RestartSec=300
+
+[Install]
+WantedBy=default.target

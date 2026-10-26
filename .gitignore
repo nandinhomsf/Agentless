@@ -175,7 +175,7 @@ cython_debug/
 /get_repo_structure/sympy
 /get_repo_structure/xarray
 get_repo_structure/test_repo/
-results/
+/results/*
 logs/
 dev/
 
@@ -185,3 +185,25 @@ dev/
 
 # Jupyter Notebooks
 *.ipynb
+
+# --- genai-agentless (replication) -------------------------------------------
+# large or machine-specific inputs; fetched by scripts/download_data.sh
+/data/*
+!/data/subset_*.txt
+!/data/paper_results/
+/data/paper_results/*
+!/data/paper_results/official_results.json
+/embedding/
+/playground/
+/.claude/
+# light results kept in the repo; the full artifacts go in the tarball
+!/results/summary/
+!/results/flashlite_reduced/
+/results/flashlite_reduced/*
+!/results/flashlite_reduced/eval_report.json
+!/results/flashlite_reduced/all_preds.jsonl
+!/results/flashlite_reduced_ext/
+/results/flashlite_reduced_ext/*
+!/results/flashlite_reduced_ext/eval_report.json
+!/results/flashlite_reduced_ext/all_preds.jsonl
+!/results/resultados_completos.tar.gz
