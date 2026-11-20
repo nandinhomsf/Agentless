@@ -752,7 +752,7 @@ def main():
         "--backend",
         type=str,
         default="openai",
-        choices=["openai", "deepseek", "anthropic", "gemini", "nvidia"],
+        choices=["openai", "deepseek", "anthropic", "gemini", "nvidia", "anthropic-compat", "openai-reasoning"],
     )
     parser.add_argument("--output_folder", type=str, required=True)
     parser.add_argument("--post_process", action="store_true")

@@ -423,6 +423,9 @@ class OpenAICompatChatDecoder(DecoderBase):
     def default_reasoning_effort(self, name, env):
         return None
 
+    def adjust_config(self, config):
+        """Hook for provider-specific request parameters."""
+
     def _throttle(self, prompt_tokens):
         cls = OpenAICompatChatDecoder
         with cls._lock:
@@ -461,6 +464,7 @@ class OpenAICompatChatDecoder(DecoderBase):
             )
             if self.reasoning_effort:
                 config["reasoning_effort"] = self.reasoning_effort
+            self.adjust_config(config)
             window_entry = self._throttle(
                 int(self.token_pad * num_tokens_from_messages(message)) + 50
             )
@@ -514,6 +518,39 @@ class NvidiaChatDecoder(OpenAICompatChatDecoder):
     env_prefix = "NVIDIA"
 
 
+class AnthropicCompatChatDecoder(OpenAICompatChatDecoder):
+    """Claude through Anthropic's OpenAI-compatible endpoint (paid, prepaid credits).
+
+    Thinking is off unless ANTHROPIC_REASONING_EFFORT is set.
+    """
+
+    base_url = "https://api.anthropic.com/v1/"
+    env_prefix = "ANTHROPIC"
+
+    def default_reasoning_effort(self, name, env):
+        return env("REASONING_EFFORT") or None
+
+
+class OpenAIReasoningChatDecoder(OpenAICompatChatDecoder):
+    """OpenAI reasoning models (paid, prepaid credits).
+
+    Reasoning models reject `temperature` and `max_tokens`; reasoning tokens
+    count against `max_completion_tokens`, so set OPENAI_THINKING_HEADROOM.
+    Sampling diversity comes from the model's own stochasticity.
+    """
+
+    base_url = "https://api.openai.com/v1"
+    env_prefix = "OPENAI"
+
+    def default_reasoning_effort(self, name, env):
+        return env("REASONING_EFFORT") or None
+
+    def adjust_config(self, config):
+        if self.reasoning_effort:
+            config.pop("temperature", None)
+            config["max_completion_tokens"] = config.pop("max_tokens")
+
+
 def make_model(
     model: str,
     backend: str,
@@ -540,6 +577,19 @@ def make_model(
         )
     elif backend == "deepseek":
         return DeepSeekChatDecoder(
+            name=model,
+            logger=logger,
+            batch_size=batch_size,
+            max_new_tokens=max_tokens,
+            temperature=temperature,
+        )
+    elif backend in ("anthropic-compat", "openai-reasoning"):
+        decoder = (
+            AnthropicCompatChatDecoder
+            if backend == "anthropic-compat"
+            else OpenAIReasoningChatDecoder
+        )
+        return decoder(
             name=model,
             logger=logger,
             batch_size=batch_size,

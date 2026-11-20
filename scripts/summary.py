@@ -188,6 +188,18 @@ def main():
     open(f"{OUT}/RESUMO.md", "w").write(text)
     print(text)
 
+    # Métricas extras (custo/tokens e diferença pareada). Opcional: se falhar, o
+    # RESUMO.md acima já está escrito e nada muda.
+    try:
+        from extra_metrics import run_extra
+
+        extra = run_extra()
+        with open(f"{OUT}/RESUMO.md", "a") as f:
+            f.write("\n" + extra)
+        print(extra)
+    except Exception as e:  # noqa: BLE001
+        print(f"[aviso] métricas extras puladas: {e}")
+
 
 if __name__ == "__main__":
     main()
