@@ -585,7 +585,7 @@ def main():
         "--backend",
         type=str,
         default="openai",
-        choices=["openai", "deepseek", "anthropic", "gemini", "nvidia", "anthropic-compat", "openai-reasoning"],
+        choices=["openai", "deepseek", "anthropic", "gemini", "nvidia", "anthropic-compat", "anthropic-native", "openai-reasoning"],
     )
     parser.add_argument(
         "--dataset",

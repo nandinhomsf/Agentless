@@ -530,6 +530,97 @@ class AnthropicCompatChatDecoder(OpenAICompatChatDecoder):
     def default_reasoning_effort(self, name, env):
         return env("REASONING_EFFORT") or None
 
+    def adjust_config(self, config):
+        # Claude 5.x rejects `temperature` ("deprecated for this model", HTTP 400),
+        # so the paper's 0.8 sampling cannot be requested: sample diversity comes
+        # from the provider's default sampling. Set ANTHROPIC_SEND_TEMPERATURE=1
+        # to send it anyway (older Claude models).
+        if not os.environ.get("ANTHROPIC_SEND_TEMPERATURE"):
+            config.pop("temperature", None)
+
+
+class AnthropicNativeChatDecoder(OpenAICompatChatDecoder):
+    """Claude through Anthropic's native Messages API (/v1/messages).
+
+    Unlike the OpenAI-compatible endpoint, it honours `output_config.effort`
+    (ANTHROPIC_EFFORT=low|medium|high; empty = provider default). Thinking tokens
+    count against max_tokens, so ANTHROPIC_THINKING_HEADROOM adds room for them.
+    `temperature` is not sent (Claude 5.x rejects it) unless
+    ANTHROPIC_SEND_TEMPERATURE=1. Rate limiting reuses ANTHROPIC_RPM/TPM.
+    Only used with `--backend anthropic-native`; other backends are unaffected.
+    """
+
+    env_prefix = "ANTHROPIC"
+    base_url = None  # the SDK default (https://api.anthropic.com)
+
+    def default_reasoning_effort(self, name, env):
+        return env("EFFORT") or None  # here: the output_config.effort level
+
+    def _request(self, config):
+        import anthropic  # local import: only this backend needs the SDK
+
+        client = anthropic.Anthropic(api_key=self.api_key, timeout=900)
+        for retries in range(40):
+            try:
+                return client.messages.create(**config)
+            except anthropic.BadRequestError as e:
+                self.logger.info(e)
+                raise Exception("Invalid API Request") from e
+            except anthropic.RateLimitError as e:
+                self.logger.info(f"Rate limit exceeded. Waiting... {e}")
+                time.sleep(min(10 * 2 ** min(retries, 3), 90))
+            except (anthropic.InternalServerError, anthropic.APIConnectionError) as e:
+                self.logger.info(f"Server/connection error. Waiting... {e}")
+                time.sleep(min(30 * 2 ** min(retries, 3), 300))
+        return None
+
+    def codegen(
+        self, message, num_samples: int = 1, prompt_cache: bool = False
+    ) -> List[dict]:
+        if self.temperature == 0:
+            assert num_samples == 1
+
+        trajs = []
+        for _ in range(num_samples):
+            messages = (
+                message
+                if isinstance(message, list)
+                else [{"role": "user", "content": message}]
+            )
+            config = {
+                "model": self.name,
+                "max_tokens": self.max_new_tokens + self.thinking_headroom,
+                "system": "You are a helpful assistant.",
+                "messages": messages,
+            }
+            if self.reasoning_effort:
+                config["extra_body"] = {"output_config": {"effort": self.reasoning_effort}}
+            if os.environ.get("ANTHROPIC_SEND_TEMPERATURE"):
+                config["temperature"] = self.temperature
+            window_entry = self._throttle(
+                int(self.token_pad * num_tokens_from_messages(message)) + 50
+            )
+            ret = self._request(config)
+            if not ret:
+                raise RuntimeError("ANTHROPIC request failed after all retries")
+            window_entry[1] = ret.usage.input_tokens or window_entry[1]
+            if ret.stop_reason == "max_tokens":
+                self.logger.info("WARNING: response truncated by max_tokens")
+            trajs.append(
+                {
+                    # thinking blocks are dropped; Agentless parses only the answer
+                    "response": "".join(
+                        b.text for b in ret.content if getattr(b, "type", "") == "text"
+                    ),
+                    "usage": {
+                        # output_tokens already includes the thinking tokens
+                        "completion_tokens": ret.usage.output_tokens,
+                        "prompt_tokens": ret.usage.input_tokens,
+                    },
+                }
+            )
+        return trajs
+
 
 class OpenAIReasoningChatDecoder(OpenAICompatChatDecoder):
     """OpenAI reasoning models (paid, prepaid credits).
@@ -577,6 +668,14 @@ def make_model(
         )
     elif backend == "deepseek":
         return DeepSeekChatDecoder(
+            name=model,
+            logger=logger,
+            batch_size=batch_size,
+            max_new_tokens=max_tokens,
+            temperature=temperature,
+        )
+    elif backend == "anthropic-native":
+        return AnthropicNativeChatDecoder(
             name=model,
             logger=logger,
             batch_size=batch_size,

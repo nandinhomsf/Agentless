@@ -5,8 +5,16 @@ Writes results/summary/RESUMO.md (tables) and results/summary/por_issue.csv
 oracle evaluation (scripts/oracle_run.sh) progresses.
 
     .venv/bin/python scripts/summary.py
+
+Outro modelo (sem mexer no padrao acima), por exemplo o Haiku 5.5:
+
+    .venv/bin/python scripts/summary.py --out-dir results/summary_agentless_haiku \
+        --runs results/haiku_reduced:data/subset_15.txt \
+               results/haiku_reduced_ext:data/subset_ext.txt \
+        --label "Haiku 5.5 (medium), 2×3 patches, 4 testes" --model claude-haiku-5-5
 """
 
+import argparse
 import csv
 import glob
 import json
@@ -24,6 +32,8 @@ RUNS = {  # results dir -> issue list
     "results/flashlite_reduced_ext": "data/subset_ext.txt",
 }
 OUT = "results/summary"
+LABEL = "Gemini 3.1 Flash-Lite, 2×3 patches, 4 testes"  # rotulo da nossa execucao no RESUMO.md
+MODEL = "gemini-3.1-flash-lite"  # chave de preco para as metricas extras
 STAGES = [
     ("Arquivos via LLM", "file_level/loc_outputs.jsonl"),
     ("Arquivos via embeddings", "retrievel_embedding/retrieve_locs.jsonl"),
@@ -136,7 +146,7 @@ def main():
           "## Resolução", "",
           "| | Resolvidas | IC 95% (Wilson) |", "|---|---|---|",
           f"| Paper (GPT-4o, 4×10 patches, 40 testes) | {pct(paper)} | {wilson(paper, n)} |",
-          f"| Nós (Gemini 3.1 Flash-Lite, 2×3 patches, 4 testes) | {pct(ours)} | {wilson(ours, n)} |", "",
+          f"| Nós ({LABEL}) | {pct(ours)} | {wilson(ours, n)} |", "",
           f"Ambos: {both} · só nós: {only_ours} · só paper: {only_paper} · nenhum: {n - both - only_ours - only_paper} "
           f"· McNemar exato p = {mcnemar(only_ours, only_paper):.2f}", "",
           "### Por execução", "", "| Execução | Issues | Paper | Nós |", "|---|---|---|---|"]
@@ -193,7 +203,7 @@ def main():
     try:
         from extra_metrics import run_extra
 
-        extra = run_extra()
+        extra = run_extra(runs=list(RUNS.items()), modelo=MODEL, nome="Nós")
         with open(f"{OUT}/RESUMO.md", "a") as f:
             f.write("\n" + extra)
         print(extra)
@@ -201,5 +211,20 @@ def main():
         print(f"[aviso] métricas extras puladas: {e}")
 
 
+def parse_args():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--runs", nargs="*", help="pares diretorio_de_resultados:arquivo_de_ids (padrao: Flash-Lite)")
+    ap.add_argument("--out-dir", default=None, help="onde gravar RESUMO.md e por_issue.csv")
+    ap.add_argument("--label", default=None, help="rotulo da execucao no RESUMO.md")
+    ap.add_argument("--model", default=None, help="chave de preco das metricas extras")
+    return ap.parse_args()
+
+
 if __name__ == "__main__":
+    a = parse_args()
+    if a.runs:
+        RUNS = dict(r.split(":", 1) for r in a.runs)
+    OUT = a.out_dir or OUT
+    LABEL = a.label or LABEL
+    MODEL = a.model or MODEL
     main()
