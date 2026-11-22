@@ -317,8 +317,13 @@ devolvem o ambiente ao comportamento da época.
   47 issues, a faixa tem ~±13 pontos percentuais, e as duas faixas se sobrepõem
   quase inteiras.
 - **Teste de McNemar (exato):** compara os dois sistemas **nas mesmas issues**,
-  olhando só os desacordos (5 contra 6). Deu **p = 1,00**: não há diferença
-  estatística.
+  olhando só os desacordos (5 contra 6). Deu **p = 1,00**: não há evidência de
+  diferença.
+- **Diferença pareada com IC (bootstrap):** −2,1 p.p., IC 95% [−14,9; +10,6].
+  Atenção: p alto **não prova que os dois são equivalentes**. O intervalo ainda
+  admite que fiquemos ~15 p.p. abaixo ou ~11 p.p. acima do paper. O correto é
+  dizer que o resultado é **inconclusivo** quanto a equivalência, por causa do
+  tamanho da amostra (`scripts/extra_metrics.py`).
 
 ### 8.2 Localização (o arquivo do patch oficial foi encontrado?)
 
@@ -363,7 +368,7 @@ pontos percentuais); no nosso caso, é de 4 pontos.
    agente, resolve ~36–38% das issues do Lite-S, mesmo com um modelo bem menor e
    gratuito.
 2. **40 patches e 40 testes não são necessários** para chegar a esse patamar.
-   Com 6 e 4, empatamos estatisticamente. Isso reforça a saturação mostrada na
+   Com 6 e 4, não há evidência de diferença (embora o IC seja largo). Isso é coerente com a saturação mostrada na
    Figura 6 do paper e reduz o custo em ~5 vezes.
 3. **Embeddings locais e gratuitos bastam.** O `bge-small` encontrou o arquivo
    certo com mais frequência que os embeddings da OpenAI.

@@ -1,12 +1,20 @@
 """Métricas extras do estudo: custo por issue resolvida e diferença pareada com IC.
 
-Descrição das métricas: METRICAS_NOVAS.txt. Não depende de `datasets` nem de rede;
+Descrição das métricas: docs/METRICAS_NOVAS.md. Não depende de `datasets` nem de rede;
 lê só os arquivos que o pipeline já grava em cada `results/<run>/`.
 
     .venv/bin/python scripts/extra_metrics.py
     .venv/bin/python scripts/extra_metrics.py --modelo claude-haiku-5-5 \
         --runs results/haiku_reduced:data/subset_15.txt \
                results/haiku_reduced_ext:data/subset_ext.txt
+
+Agente (mini-SWE-agent) contra o Agentless, mesmas issues:
+
+    .venv/bin/python scripts/extra_metrics.py --nome Agente \
+        --runs results/agent_flashlite:data/subset_47.txt \
+        --contra results/flashlite_reduced:data/subset_15.txt \
+                 results/flashlite_reduced_ext:data/subset_ext.txt \
+        --out results/summary/METRICAS_AGENTE.md
 
 O scripts/summary.py chama `run_extra()` no fim; se falhar, o RESUMO.md original
 já foi escrito.
@@ -43,6 +51,7 @@ ETAPAS = [
     ("Geração de patches", "repair_sample_*/output.jsonl", "traj"),
     ("Testes de reprodução", "reproduction_test_samples/output.jsonl", "traj"),
     ("Seleção de testes de regressão", "select_regression/output.jsonl", "traj"),
+    ("Agente (mini-SWE-agent, todas as chamadas)", "agent_usage.jsonl", "traj"),
 ]
 
 
@@ -117,7 +126,7 @@ def conclusao(lo, hi, margem):
 
 
 def run_extra(runs=None, modelo="gemini-3.1-flash-lite", preco=None, margem=0.10,
-              paper=PAPER, nome="Nós"):
+              paper=PAPER, nome="Nós", contra=None, nome_contra="Agentless"):
     runs = runs or DEFAULT_RUNS
     pin, pout = preco or PRECOS[modelo]
     ids, resolved = [], set()
@@ -142,6 +151,8 @@ def run_extra(runs=None, modelo="gemini-3.1-flash-lite", preco=None, margem=0.10
           f"### Custo e tokens ({nome}: {modelo}; US$ {pin}/{pout} por 1M tokens entrada/saída)", "",
           "| Etapa | Tokens entrada | Tokens saída | Custo (US$) |", "|---|---|---|---|"]
     for label, (p, c) in tokens.items():
+        if not (p or c) and label.startswith("Agente"):
+            continue
         md.append(f"| {label} | {p:,} | {c:,} | {custo(p, c):.3f} |")
     md += [f"| **Total** | **{tot_p:,}** | **{tot_c:,}** | **{total:.3f}** |", "",
            f"- Custo por issue: US$ {total / n:.3f} ({n} issues)",
@@ -156,23 +167,34 @@ def run_extra(runs=None, modelo="gemini-3.1-flash-lite", preco=None, margem=0.10
         md.append(f"Resultados do paper não encontrados em `{pr_path}`.")
     else:
         paper_res = set(json.load(open(pr_path))["resolved"])
-        a = [int(i in resolved) for i in ids]
-        b = [int(i in paper_res) for i in ids]
-        diff, lo, hi = bootstrap_diff(a, b)
-        so_a = sum(x and not y for x, y in zip(a, b))
-        so_b = sum(y and not x for x, y in zip(a, b))
-        ambos = sum(x and y for x, y in zip(a, b))
-        md += ["| | Resolvidas |", "|---|---|",
-               f"| {nome} | {sum(a)}/{n} ({sum(a) / n:.1%}) |",
-               f"| Paper (mesmas {n} issues) | {sum(b)}/{n} ({sum(b) / n:.1%}) |", "",
-               f"- Diferença ({nome} − paper): **{diff * 100:+.1f} p.p.**, IC 95% bootstrap pareado "
-               f"[{lo * 100:+.1f}, {hi * 100:+.1f}] p.p. (10.000 reamostragens)",
-               f"- Discordâncias: só {nome} {so_a} · só paper {so_b} · ambos {ambos} · "
-               f"nenhum {n - ambos - so_a - so_b} · McNemar exato p = {mcnemar(so_a, so_b):.2f}",
-               f"- Conclusão: {conclusao(lo, hi, margem)}", "",
-               "_A margem de equivalência é uma escolha do estudo (`--margem`); "
-               "p alto no McNemar não prova equivalência._"]
+        md += paired_section(ids, resolved, nome, paper_res, "paper", margem, f"Paper (mesmas {n} issues)")
+    if contra:
+        contra_res = set()
+        for run, ids_file in contra:
+            contra_res |= resolved_ids(run) & set(read_ids(ids_file))
+        md += ["", f"### Diferença pareada vs. {nome_contra} (mesmas issues)", ""]
+        md += paired_section(ids, resolved, nome, contra_res, nome_contra, margem)
     return "\n".join(md) + "\n"
+
+
+def paired_section(ids, res_a, nome_a, res_b, nome_b, margem, rotulo_b=None):
+    n = len(ids)
+    a = [int(i in res_a) for i in ids]
+    b = [int(i in res_b) for i in ids]
+    diff, lo, hi = bootstrap_diff(a, b)
+    so_a = sum(x and not y for x, y in zip(a, b))
+    so_b = sum(y and not x for x, y in zip(a, b))
+    ambos = sum(x and y for x, y in zip(a, b))
+    return ["| | Resolvidas |", "|---|---|",
+            f"| {nome_a} | {sum(a)}/{n} ({sum(a) / n:.1%}) |",
+            f"| {rotulo_b or nome_b} | {sum(b)}/{n} ({sum(b) / n:.1%}) |", "",
+            f"- Diferença ({nome_a} − {nome_b}): **{diff * 100:+.1f} p.p.**, IC 95% bootstrap pareado "
+            f"[{lo * 100:+.1f}, {hi * 100:+.1f}] p.p. (10.000 reamostragens)",
+            f"- Discordâncias: só {nome_a} {so_a} · só {nome_b} {so_b} · ambos {ambos} · "
+            f"nenhum {n - ambos - so_a - so_b} · McNemar exato p = {mcnemar(so_a, so_b):.2f}",
+            f"- Conclusão: {conclusao(lo, hi, margem)}", "",
+            "_A margem de equivalência é uma escolha do estudo (`--margem`); "
+            "p alto no McNemar não prova equivalência._"]
 
 
 def main():
@@ -183,11 +205,14 @@ def main():
     ap.add_argument("--margem", type=float, default=0.10, help="margem de equivalência (fração)")
     ap.add_argument("--nome", default="Nós")
     ap.add_argument("--paper", default=PAPER)
+    ap.add_argument("--contra", nargs="*", help="pares dir:arquivo_de_ids de outra abordagem a comparar")
+    ap.add_argument("--nome-contra", default="Agentless")
     ap.add_argument("--out", default=f"{OUT}/METRICAS_EXTRA.md")
     args = ap.parse_args()
     runs = [tuple(r.split(":", 1)) for r in args.runs] if args.runs else None
+    contra = [tuple(r.split(":", 1)) for r in args.contra] if args.contra else None
     text = run_extra(runs, args.modelo, tuple(args.preco) if args.preco else None,
-                     args.margem, args.paper, args.nome)
+                     args.margem, args.paper, args.nome, contra, args.nome_contra)
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     open(args.out, "w").write(text)
     print(text)

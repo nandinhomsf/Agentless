@@ -5,7 +5,7 @@
 #
 # Usage: [CONFIG=scripts/configs/x.env] scripts/pipeline.sh <stage>
 # (stages listed at the bottom; "llm" and "exec" run all LLM / all Docker
-# stages respectively)
+# stages respectively; "agentic" runs the mini-SWE-agent baseline and evaluates it)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -25,6 +25,10 @@ WORKERS=${WORKERS:-3}           # parallel Docker containers (12 GB RAM)
 N_LOC=${N_LOC:-4}               # edit-location samples (paper: 4)
 N_REPAIR=${N_REPAIR:-10}        # patches per location set (paper: 10)
 N_REPRO=${N_REPRO:-40}          # reproduction test samples (paper: 40)
+# Docker run ids are shared across runs and the harness skips instances that
+# already have a report under the same id, so repeated runs need a prefix
+P=${RUN_PREFIX:-}
+RUN_NAME=${RUN_NAME:-agentless_replication}
 IDS=$(tr '\n' ' ' < "$AGENTLESS_INSTANCE_IDS_FILE")
 PY=.venv/bin/python
 mkdir -p "$R"
@@ -74,7 +78,7 @@ repair() {
 
 select_regression() {
   [ -f $R/passing_tests.jsonl ] || $PY agentless/test/run_regression_tests.py \
-    --run_id generate_regression_tests --output_file $R/passing_tests.jsonl \
+    --run_id ${P}generate_regression_tests --output_file $R/passing_tests.jsonl \
     --instance_ids $IDS --num_workers $WORKERS
   $PY agentless/test/select_regression_tests.py $LLM \
     --passing_tests $R/passing_tests.jsonl --output_folder $R/select_regression
@@ -90,7 +94,7 @@ run_repro_on_original() {
     f=$R/reproduction_test_samples/output_${num}_processed_reproduction_test.jsonl
     [ -f "${f%.jsonl}_verified.jsonl" ] && continue
     $PY agentless/test/run_reproduction_tests.py \
-      --run_id=reproduction_test_generation_filter_sample_${num} \
+      --run_id=${P}reproduction_test_generation_filter_sample_${num} \
       --test_jsonl=$f --num_workers $WORKERS --instance_ids $IDS --testing
   done
   $PY agentless/test/generate_reproduction_tests.py --max_samples $N_REPRO \
@@ -106,12 +110,12 @@ run_tests_on_patches() {
       [ -f $folder/output_${num}_regression_test_results.jsonl ] ||
         $PY agentless/test/run_regression_tests.py \
           --regression_tests $R/select_regression/output.jsonl \
-          --predictions_path=$p --run_id=repair_sample_${i}_regression_${num} \
+          --predictions_path=$p --run_id=${P}repair_sample_${i}_regression_${num} \
           --instance_ids $IDS --num_workers $WORKERS
       [ -f $folder/output_${num}_reproduction_test_results.jsonl ] ||
         $PY agentless/test/run_reproduction_tests.py \
           --test_jsonl $R/reproduction_test_samples/reproduction_tests.jsonl \
-          --predictions_path=$p --run_id=repair_sample_${i}_reproduction_${num} \
+          --predictions_path=$p --run_id=${P}repair_sample_${i}_reproduction_${num} \
           --instance_ids $IDS --num_workers $WORKERS
     done
   done
@@ -127,7 +131,19 @@ rerank() {
 evaluate() {
   $PY -m swebench.harness.run_evaluation \
     --dataset_name princeton-nlp/SWE-bench_Lite --predictions_path $R/all_preds.jsonl \
-    --instance_ids $IDS --max_workers $WORKERS --run_id agentless_replication
+    --instance_ids $IDS --max_workers $WORKERS --run_id ${P}${RUN_NAME}
+  # the harness writes <model>.<run_id>.json in the repo root; keep it with the run
+  cp "$(ls -t ./*.${P}${RUN_NAME}.json | head -1)" $R/eval_report.json
+}
+
+# agentic baseline (mini-SWE-agent, separate venv); exits 3 when the daily quota
+# runs out, which the runner waits out without counting it as a failure
+agent() {
+  .venv-agent/bin/python scripts/agentic/run_agent.py \
+    --ids "$AGENTLESS_INSTANCE_IDS_FILE" --output $R --workers $WORKERS \
+    --provider ${AGENT_PROVIDER:-gemini} --model $MODEL --budget ${AGENT_BUDGET:-0} \
+    --step-limit ${AGENT_STEP_LIMIT:-50} --cost-limit ${AGENT_COST_LIMIT:-1.0} \
+    --temperature ${AGENT_TEMPERATURE:-0}
 }
 
 # stages are resumable, so on a crash (e.g. a long 503 outage) just rerun
@@ -145,6 +161,7 @@ retry() {
 case "${1:-}" in
   llm) for st in file_level related_level edit_level repair gen_repro; do retry $st; done ;;
   exec) select_regression; run_repro_on_original; run_tests_on_patches; rerank; evaluate ;;
-  file_level|related_level|edit_level|repair|select_regression|gen_repro|run_repro_on_original|run_tests_on_patches|rerank|evaluate) "$1" ;;
+  agentic) agent; evaluate ;;
+  file_level|related_level|edit_level|repair|select_regression|gen_repro|run_repro_on_original|run_tests_on_patches|rerank|evaluate|agent) "$1" ;;
   *) sed -n "2,8p" "$0"; exit 1 ;;
 esac

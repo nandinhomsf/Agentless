@@ -122,6 +122,7 @@ celerybeat.pid
 # Environments
 .env
 .venv
+.venv-agent/
 env/
 venv/
 ENV/
@@ -207,3 +208,33 @@ dev/
 !/results/flashlite_reduced_ext/eval_report.json
 !/results/flashlite_reduced_ext/all_preds.jsonl
 !/results/resultados_completos.tar.gz
+# Agentless runs: official report and chosen patches (full artifacts stay local)
+!/results/flashlite_reduced_r2/
+/results/flashlite_reduced_r2/*
+!/results/flashlite_reduced_r2/eval_report.json
+!/results/flashlite_reduced_r2/all_preds.jsonl
+!/results/flashlite_reduced_ext_r2/
+/results/flashlite_reduced_ext_r2/*
+!/results/flashlite_reduced_ext_r2/eval_report.json
+!/results/flashlite_reduced_ext_r2/all_preds.jsonl
+!/results/luna_reduced/
+/results/luna_reduced/*
+!/results/luna_reduced/eval_report.json
+!/results/luna_reduced/all_preds.jsonl
+!/results/luna_reduced_ext/
+/results/luna_reduced_ext/*
+!/results/luna_reduced_ext/eval_report.json
+!/results/luna_reduced_ext/all_preds.jsonl
+# agent runs: report, patches, per-issue usage and the trajectories (compressed)
+!/results/agent_luna/
+/results/agent_luna/*
+!/results/agent_luna/eval_report.json
+!/results/agent_luna/all_preds.jsonl
+!/results/agent_luna/agent_usage.jsonl
+!/results/agent_luna/trajetorias.tar.gz
+!/results/agent_flashlite/
+/results/agent_flashlite/*
+!/results/agent_flashlite/eval_report.json
+!/results/agent_flashlite/all_preds.jsonl
+!/results/agent_flashlite/agent_usage.jsonl
+!/results/agent_flashlite/trajetorias.tar.gz

@@ -10,8 +10,13 @@ JOBS=(
   "scripts/configs/flashlite_reduced.env exec"
   "scripts/configs/flashlite_reduced_ext.env llm"
   "scripts/configs/flashlite_reduced_ext.env exec"
+  "scripts/configs/flashlite_reduced_r2.env llm"
+  "scripts/configs/flashlite_reduced_r2.env exec"
+  "scripts/configs/flashlite_reduced_ext_r2.env llm"
+  "scripts/configs/flashlite_reduced_ext_r2.env exec"
+  "scripts/configs/agent_flashlite.env agentic"
 )
-MAX_ATTEMPTS=48        # x 30 min: keeps retrying for a day (e.g. daily LLM quota)
+MAX_ATTEMPTS=48        # x 30 min of real failures (quota waits do not count)
 
 log() { echo "[$(date '+%d/%m %H:%M:%S')] $*"; }
 
@@ -37,13 +42,6 @@ wait_manual_runs() {
 
 results_dir() { ( source "$1"; echo "${RESULTS:-results/replication}" ); }
 
-save_eval_report() {
-  # the harness writes <model>.agentless_replication.json in the repo root;
-  # every run shares that run_id, so keep a copy next to each run's results
-  local report
-  report=$(ls -t ./*.agentless_replication.json 2> /dev/null | head -1)
-  [ -n "$report" ] && cp "$report" "$1/eval_report.json" && log "saved $report -> $1/eval_report.json"
-}
 
 log "runner started"
 wait_manual_runs
@@ -53,15 +51,22 @@ for job in "${JOBS[@]}"; do
   marker="$R/.done_$phase"
   [ -f "$marker" ] && { log "skip (done): $job"; continue; }
 
-  for attempt in $(seq 1 $MAX_ATTEMPTS); do
+  attempt=1
+  while [ $attempt -le $MAX_ATTEMPTS ]; do
     wait_network
-    [ "$phase" = exec ] && wait_docker
+    [ "$phase" != llm ] && wait_docker
     log "start: $job (attempt $attempt)"
-    if CONFIG="$config" scripts/pipeline.sh "$phase"; then
-      [ "$phase" = exec ] && save_eval_report "$R"
+    CONFIG="$config" scripts/pipeline.sh "$phase"; rc=$?
+    if [ $rc -eq 0 ]; then
       touch "$marker"; log "done: $job"; break
     fi
-    log "failed: $job; retrying in 30 min"
+    # exit 3 = daily LLM quota used up: a multi-day job, not a failure
+    if [ $rc -eq 3 ]; then
+      log "daily quota exhausted: $job; checking again in 30 min"
+    else
+      log "failed: $job; retrying in 30 min"
+      attempt=$((attempt + 1))
+    fi
     sleep 1800
   done
   [ -f "$marker" ] || { log "giving up on: $job"; exit 1; }

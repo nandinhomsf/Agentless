@@ -39,8 +39,8 @@ Return only the selected tests.
 
 def select_test(instance_id, args, swe_bench_data, prev_o, passing_tests):
     def _parse_model_return_lines(content: str) -> list[str]:
-        if content:
-            return content.strip().split("\n")
+        # reasoning models may answer with nothing when no test should be excluded
+        return content.strip().split("\n") if content else []
 
     if args.target_id is not None:
         if args.target_id != instance_id:
