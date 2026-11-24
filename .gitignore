@@ -187,54 +187,24 @@ dev/
 # Jupyter Notebooks
 *.ipynb
 
-# --- genai-agentless (replication) -------------------------------------------
-# large or machine-specific inputs; fetched by scripts/download_data.sh
-/data/*
-!/data/subset_*.txt
-!/data/paper_results/
-/data/paper_results/*
-!/data/paper_results/official_results.json
+# --- pesquisa/ (nossa replicação e comparação) -------------------------------
+# entradas grandes ou locais; baixadas por pesquisa/scripts/download_data.sh
+/pesquisa/data/*
+!/pesquisa/data/subset_*.txt
+!/pesquisa/data/paper_results/
+/pesquisa/data/paper_results/*
+!/pesquisa/data/paper_results/official_results.json
 /embedding/
 /playground/
 /.claude/
-# light results kept in the repo; the full artifacts go in the tarball
-!/results/summary/
-!/results/flashlite_reduced/
-/results/flashlite_reduced/*
-!/results/flashlite_reduced/eval_report.json
-!/results/flashlite_reduced/all_preds.jsonl
-!/results/flashlite_reduced_ext/
-/results/flashlite_reduced_ext/*
-!/results/flashlite_reduced_ext/eval_report.json
-!/results/flashlite_reduced_ext/all_preds.jsonl
-!/results/resultados_completos.tar.gz
-# Agentless runs: official report and chosen patches (full artifacts stay local)
-!/results/flashlite_reduced_r2/
-/results/flashlite_reduced_r2/*
-!/results/flashlite_reduced_r2/eval_report.json
-!/results/flashlite_reduced_r2/all_preds.jsonl
-!/results/flashlite_reduced_ext_r2/
-/results/flashlite_reduced_ext_r2/*
-!/results/flashlite_reduced_ext_r2/eval_report.json
-!/results/flashlite_reduced_ext_r2/all_preds.jsonl
-!/results/luna_reduced/
-/results/luna_reduced/*
-!/results/luna_reduced/eval_report.json
-!/results/luna_reduced/all_preds.jsonl
-!/results/luna_reduced_ext/
-/results/luna_reduced_ext/*
-!/results/luna_reduced_ext/eval_report.json
-!/results/luna_reduced_ext/all_preds.jsonl
-# agent runs: report, patches, per-issue usage and the trajectories (compressed)
-!/results/agent_luna/
-/results/agent_luna/*
-!/results/agent_luna/eval_report.json
-!/results/agent_luna/all_preds.jsonl
-!/results/agent_luna/agent_usage.jsonl
-!/results/agent_luna/trajetorias.tar.gz
-!/results/agent_flashlite/
-/results/agent_flashlite/*
-!/results/agent_flashlite/eval_report.json
-!/results/agent_flashlite/all_preds.jsonl
-!/results/agent_flashlite/agent_usage.jsonl
-!/results/agent_flashlite/trajetorias.tar.gz
+# resultados: só o relatório oficial, os patches e o uso de tokens de cada execução;
+# os artefatos completos ficam em resultados_completos.tar.gz
+/pesquisa/results/*/*
+/pesquisa/results/nao_usados/
+!/pesquisa/results/summary/*
+!/pesquisa/results/*/eval_report*.json
+!/pesquisa/results/*/all_preds.jsonl
+!/pesquisa/results/*/preds*.jsonl
+!/pesquisa/results/*/agent_usage.jsonl
+!/pesquisa/results/*/meta.jsonl
+!/pesquisa/results/*/trajetorias.tar.gz
