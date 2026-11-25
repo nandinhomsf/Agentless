@@ -29,8 +29,8 @@ import random
 PAPER = "pesquisa/data/paper_results"
 OUT = "pesquisa/results/summary"
 DEFAULT_RUNS = [
-    ("pesquisa/results/flashlite_reduced", "pesquisa/data/subset_15.txt"),
-    ("pesquisa/results/flashlite_reduced_ext", "pesquisa/data/subset_ext.txt"),
+    ("pesquisa/results/luna_reduced", "pesquisa/data/subset_15.txt"),
+    ("pesquisa/results/luna_reduced_ext", "pesquisa/data/subset_ext.txt"),
 ]
 # US$ por 1M de tokens (entrada, saída). Fonte: páginas de modelo da Artificial
 # Analysis; confira no console do provedor antes de citar.
@@ -128,7 +128,7 @@ def conclusao(lo, hi, margem):
     return "inconclusivo (IC largo demais para afirmar equivalência ou diferença)"
 
 
-def run_extra(runs=None, modelo="gemini-3.1-flash-lite", preco=None, margem=0.10,
+def run_extra(runs=None, modelo="gpt-6-luna", preco=None, margem=0.10,
               paper=PAPER, nome="Nós", contra=None, nome_contra="Agentless"):
     runs = runs or DEFAULT_RUNS
     pin, pout = preco or PRECOS[modelo]
@@ -203,7 +203,7 @@ def paired_section(ids, res_a, nome_a, res_b, nome_b, margem, rotulo_b=None):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--runs", nargs="*", help="pares dir:arquivo_de_ids")
-    ap.add_argument("--modelo", default="gemini-3.1-flash-lite")
+    ap.add_argument("--modelo", default="gpt-6-luna")
     ap.add_argument("--preco", nargs=2, type=float, metavar=("ENTRADA", "SAIDA"))
     ap.add_argument("--margem", type=float, default=0.10, help="margem de equivalência (fração)")
     ap.add_argument("--nome", default="Nós")

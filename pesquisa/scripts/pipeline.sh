@@ -19,7 +19,7 @@ export GEMINI_RPM=${GEMINI_RPM:-10} NVIDIA_RPM=${NVIDIA_RPM:-35}
 BACKEND=${BACKEND:-nvidia}
 MODEL=${MODEL:-qwen/qwen3-coder-480b-a35b-instruct}
 LLM="--model $MODEL --backend $BACKEND"
-R=${RESULTS:-results/replication}
+R=${RESULTS:-pesquisa/results/replication}
 THREADS=${THREADS:-2}           # LLM threads (shared rate limiter)
 WORKERS=${WORKERS:-3}           # parallel Docker containers (12 GB RAM)
 N_LOC=${N_LOC:-4}               # edit-location samples (paper: 4)
@@ -132,16 +132,16 @@ evaluate() {
   $PY -m swebench.harness.run_evaluation \
     --dataset_name princeton-nlp/SWE-bench_Lite --predictions_path $R/all_preds.jsonl \
     --instance_ids $IDS --max_workers $WORKERS --run_id ${P}${RUN_NAME}
-  # the harness writes <model>.<run_id>.json in the repo root; keep it with the run
-  cp "$(ls -t ./*.${P}${RUN_NAME}.json | head -1)" $R/eval_report.json
+  # the harness writes <model>.<run_id>.json in the repo root; move it next to the run
+  mv "$(ls -t ./*.${P}${RUN_NAME}.json | head -1)" $R/eval_report.json
 }
 
-# agentic baseline (mini-SWE-agent, separate venv); exits 3 when the daily quota
-# runs out, which the runner waits out without counting it as a failure
+# agentic approach (mini-SWE-agent, separate venv); with the free Gemini tier it
+# exits 3 when the daily quota runs out (rerun the next day; finished issues are kept)
 agent() {
   .venv-agent/bin/python pesquisa/scripts/agentic/run_agent.py \
     --ids "$AGENTLESS_INSTANCE_IDS_FILE" --output $R --workers $WORKERS \
-    --provider ${AGENT_PROVIDER:-gemini} --model $MODEL --budget ${AGENT_BUDGET:-0} \
+    --provider ${AGENT_PROVIDER:-openai} --model $MODEL --budget ${AGENT_BUDGET:-0} \
     --step-limit ${AGENT_STEP_LIMIT:-50} --cost-limit ${AGENT_COST_LIMIT:-1.0} \
     --temperature ${AGENT_TEMPERATURE:-0}
 }

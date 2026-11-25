@@ -5,9 +5,9 @@ issue), so the SWE-bench harness can evaluate them, and after evaluation reports
 how many issues have at least one resolving candidate (pass@all, as in the
 paper's Fig. 6 "126 / 42%").
 
-    python pesquisa/scripts/oracle_eval.py prepare --run pesquisa/results/flashlite_reduced
+    python pesquisa/scripts/oracle_eval.py prepare --run pesquisa/results/luna_reduced
     (evaluate each oracle/slot_k.jsonl with the harness, run_id oracle_<run>_k)
-    python pesquisa/scripts/oracle_eval.py report --run pesquisa/results/flashlite_reduced
+    python pesquisa/scripts/oracle_eval.py report --run pesquisa/results/luna_reduced
 """
 
 import argparse

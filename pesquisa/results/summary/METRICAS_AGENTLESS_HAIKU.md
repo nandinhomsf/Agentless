@@ -1,6 +1,6 @@
 ## Métricas extras
 
-### Custo e tokens (Haiku 5.5 (medium): claude-haiku-5-5; US$ 0.1/0.5 por 1M tokens entrada/saída)
+### Custo e tokens (Agentless Haiku: claude-haiku-5-5; US$ 0.1/0.5 por 1M tokens entrada/saída)
 
 | Etapa | Tokens entrada | Tokens saída | Custo (US$) |
 |---|---|---|---|
@@ -24,11 +24,11 @@ _Só chamadas ao LLM. Tentativas repetidas por falha de API não aparecem nos lo
 
 | | Resolvidas |
 |---|---|
-| Haiku 5.5 (medium) | 28/47 (59.6%) |
+| Agentless Haiku | 28/47 (59.6%) |
 | Paper (mesmas 47 issues) | 18/47 (38.3%) |
 
-- Diferença (Haiku 5.5 (medium) − paper): **+21.3 p.p.**, IC 95% bootstrap pareado [+4.3, +36.2] p.p. (10.000 reamostragens)
-- Discordâncias: só Haiku 5.5 (medium) 13 · só paper 3 · ambos 15 · nenhum 16 · McNemar exato p = 0.02
+- Diferença (Agentless Haiku − paper): **+21.3 p.p.**, IC 95% bootstrap pareado [+4.3, +36.2] p.p. (10.000 reamostragens)
+- Discordâncias: só Agentless Haiku 13 · só paper 3 · ambos 15 · nenhum 16 · McNemar exato p = 0.02
 - Conclusão: diferença significativa (IC exclui 0)
 
 _A margem de equivalência é uma escolha do estudo (`--margem`); p alto no McNemar não prova equivalência._

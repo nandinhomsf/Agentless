@@ -1,14 +1,14 @@
-"""Aggregate view of the replication: ours vs. the published Agentless run.
+"""Análise de uma execução do Agentless contra a execução publicada no paper, nas
+mesmas issues: resolução, localização, seleção de patch, oráculo e custo.
 
-Writes pesquisa/results/summary/RESUMO.md (tables) and pesquisa/results/summary/por_issue.csv
-(one row per issue) and prints the Markdown. Re-run any time, e.g. after the
-oracle evaluation (pesquisa/scripts/oracle_run.sh) progresses.
+Grava RESUMO.md e por_issue.csv em --out-dir (padrão: Agentless com GPT-6 Luna em
+pesquisa/results/summary/agentless_luna/). O oráculo vem de pesquisa/scripts/oracle_run.sh.
 
     .venv/bin/python pesquisa/scripts/summary.py
 
-Outro modelo (sem mexer no padrao acima), por exemplo o Haiku 5.5:
+Outro modelo, por exemplo o Haiku 5.5:
 
-    .venv/bin/python pesquisa/scripts/summary.py --out-dir pesquisa/results/summary_agentless_haiku \
+    .venv/bin/python pesquisa/scripts/summary.py --out-dir pesquisa/results/summary/agentless_haiku \
         --runs pesquisa/results/haiku_reduced:pesquisa/data/subset_15.txt \
                pesquisa/results/haiku_reduced_ext:pesquisa/data/subset_ext.txt \
         --label "Haiku 5.5 (medium), 2×3 patches, 4 testes" --model claude-haiku-5-5
@@ -28,12 +28,13 @@ from datasets import load_dataset
 from compare_runs import PAPER, files_cover, load_jsonl, patch_locations, stage_files
 
 RUNS = {  # results dir -> issue list
-    "pesquisa/results/flashlite_reduced": "pesquisa/data/subset_15.txt",
-    "pesquisa/results/flashlite_reduced_ext": "pesquisa/data/subset_ext.txt",
+    "pesquisa/results/luna_reduced": "pesquisa/data/subset_15.txt",
+    "pesquisa/results/luna_reduced_ext": "pesquisa/data/subset_ext.txt",
 }
-OUT = "pesquisa/results/summary"
-LABEL = "Gemini 3.1 Flash-Lite, 2×3 patches, 4 testes"  # rotulo da nossa execucao no RESUMO.md
-MODEL = "gemini-3.1-flash-lite"  # chave de preco para as metricas extras
+OUT = "pesquisa/results/summary/agentless_luna"
+LABEL = "GPT-6 Luna, 2×3 patches, 4 testes"  # rotulo da nossa execucao no RESUMO.md
+ORACLE_NOTE = None  # texto para quando o oráculo foi avaliado fora deste repositório
+MODEL = "gpt-6-luna"  # chave de preco para as metricas extras
 STAGES = [
     ("Arquivos via LLM", "file_level/loc_outputs.jsonl"),
     ("Arquivos via embeddings", "retrievel_embedding/retrieve_locs.jsonl"),
@@ -142,7 +143,7 @@ def main():
     only_paper = sum(r["paper_resolvida"] and not r["nossa_resolvida"] for r in rows)
     both = sum(r["nossa_resolvida"] and r["paper_resolvida"] for r in rows)
 
-    md = [f"# Resumo da replicação do Agentless ({n} issues do SWE-bench Lite-S)", "",
+    md = [f"# Agentless ({LABEL}) × paper ({n} issues do SWE-bench Lite-S)", "",
           "## Resolução", "",
           "| | Resolvidas | IC 95% (Wilson) |", "|---|---|---|",
           f"| Paper (GPT-4o, 4×10 patches, 40 testes) | {pct(paper)} | {wilson(paper, n)} |",
@@ -190,6 +191,8 @@ def main():
                f"| Patch selecionado pelo Agentless | {pct(sel, len(evaluated))} |",
                f"| Oráculo (melhor candidato possível) | {pct(orc, len(evaluated))} |", "",
                f"Issues com patch correto gerado mas não selecionado: {', '.join(lost) or 'nenhuma'}"]
+    elif ORACLE_NOTE:
+        md.append(ORACLE_NOTE)
     else:
         md.append("Ainda não avaliado (rode `pesquisa/scripts/oracle_run.sh`).")
 
@@ -213,10 +216,12 @@ def main():
 
 def parse_args():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--runs", nargs="*", help="pares diretorio_de_resultados:arquivo_de_ids (padrao: Flash-Lite)")
+    ap.add_argument("--runs", nargs="*", help="pares diretorio_de_resultados:arquivo_de_ids (padrao: Agentless com GPT-6 Luna)")
     ap.add_argument("--out-dir", default=None, help="onde gravar RESUMO.md e por_issue.csv")
     ap.add_argument("--label", default=None, help="rotulo da execucao no RESUMO.md")
     ap.add_argument("--model", default=None, help="chave de preco das metricas extras")
+    ap.add_argument("--oracle-note", default=None,
+                    help="texto da seção do oráculo quando os relatórios dele não estão em logs/")
     return ap.parse_args()
 
 
@@ -227,4 +232,5 @@ if __name__ == "__main__":
     OUT = a.out_dir or OUT
     LABEL = a.label or LABEL
     MODEL = a.model or MODEL
+    ORACLE_NOTE = a.oracle_note
     main()

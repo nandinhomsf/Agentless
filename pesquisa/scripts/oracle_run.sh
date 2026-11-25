@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Evaluate every distinct candidate patch (see pesquisa/scripts/oracle_eval.py); resumable.
-# Usage: pesquisa/scripts/oracle_run.sh [run_dir_name ...]   (default: the Flash-Lite runs)
+# Usage: pesquisa/scripts/oracle_run.sh [run_dir_name ...]   (default: the Agentless GPT-6 Luna runs)
 #        ORACLE_WORKERS=6 pesquisa/scripts/oracle_run.sh haiku_reduced haiku_reduced_ext
 cd "$(dirname "$0")/../.."
 RUNS=("$@")
-[ ${#RUNS[@]} -eq 0 ] && RUNS=(flashlite_reduced flashlite_reduced_ext)
+[ ${#RUNS[@]} -eq 0 ] && RUNS=(luna_reduced luna_reduced_ext)
 for run in "${RUNS[@]}"; do
   for slot in pesquisa/results/$run/oracle/slot_*.jsonl; do
     k=$(basename "$slot" .jsonl | sed 's/slot_//')
